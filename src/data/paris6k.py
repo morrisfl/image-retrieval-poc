@@ -1,68 +1,64 @@
-import numpy as np
-import torch.nn as nn
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
 
 import os
-import random
 
 
-GT_PATH = "gt_labels"
-IMG_QUALITY = ["good", "ok", "junk"]
-LANDMARKS = ["defense", "eiffel", "invalides", "louvre", "moulinrouge", "museedorsay", "notredame",
+
+LANDMARKS = ["defense", "eiffel", "general", "invalides", "louvre", "moulinrouge", "museedorsay", "notredame",
              "pantheon", "pompidou", "sacrecoeur", "triomphe"]
 
 
-class Paris6kDataset:
-    def __init__(self, root, query):
+class Paris6kDataset(Dataset):
+    def __init__(self, root, transform=None):
         self.root = root
+        self.transform = transform
         self.labels = LANDMARKS
-        self.data = self.get_dataset(query=query)
+        self.query_data, self.query_img = self._get_query_data()
+        self.gallery_data = self._get_gallery_data()
 
-    def get_dataset(self, query):
-        if query:
-            return self._get_query_img()
+    def __len__(self):
+        return len(self.gallery_data)
+
+    def __getitem__(self, idx):
+        img_path, label = self.gallery_data[idx]
+        img = Image.open(img_path)
+
+        if self.transform:
+            img = self.transform(img)
         else:
-            data = self._get_gallery_img()
-            dataset = []
-            for label in data:
-                for quality in data[label]:
-                    for img in data[label][quality]:
-                        dataset.append((img, label))
-            return dataset
+            img = transforms.ToTensor()(img)
 
-    def _get_query_img(self):
+        return img, label
+
+    def _get_query_data(self):
         """Return as dictionary with the label as key and a list of image paths as value."""
         data = {}
+        query_img = []
+        file_name = os.path.join(self.root, "query_images.txt")
+        file = open(file_name, "r")
+        for line in file.readlines():
+            img_name = line.split()[0]
+            label = line.split()[1]
+            folder = img_name[6:]
+            idx = folder.find("_")
+            folder = folder[:idx]
+            if label not in data:
+                data[label] = []
+            data[label].append(os.path.join(self.root, folder, img_name))
+            query_img.append(img_name)
+
+        return data, query_img
+
+    def _get_gallery_data(self):
+        """Return a list of tuples with the image path and the label."""
+        data = []
         for label in self.labels:
-            data[label] = []
-            for i in range(1, 6):
-                path = os.path.join(self.root, GT_PATH, f"{label}_{i}_query.txt")
-                file = open(path, "r")
-                img_name = file.read().split()[0] + ".jpg"
-                name = img_name[6:]
-                idx = name.find("_")
-                name = name[:idx]
-                data[label].append(os.path.join(self.root, name, img_name))
+            images = os.listdir(os.path.join(self.root, label))
+            for img in images:
+                if img not in self.query_img:
+                    data.append((os.path.join(self.root, label, img), label))
 
         return data
 
-    def _get_gallery_img(self):
-        """Return a nested dictionary with the label as key and a dictionary with the image quality as key and a list
-        of image paths as value."""
-        data = {}
-        for label in self.labels:
-            data[label] = {}
-            for quality in IMG_QUALITY:
-                data[label][quality] = []
-                path = os.path.join(self.root, GT_PATH, f"{label}_1_{quality}.txt")
-                file = open(path, "r")
-                for line in file.readlines():
-                    img_name = line.split()[0] + ".jpg"
-                    name = line[6:]
-                    idx = name.find("_")
-                    name = name[:idx]
-                    data[label][quality].append(os.path.join(self.root, name, img_name))
-
-        return data
