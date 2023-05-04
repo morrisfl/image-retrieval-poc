@@ -1,17 +1,5 @@
-import clip
 import open_clip
-import torch
 from torch.nn import Module
-
-
-class CLIPModel(Module):
-    def __init__(self, model_name, device, jit=False):
-        super(CLIPModel, self).__init__()
-        self.model, self.preprocess = clip.load(model_name, device=device, jit=jit)
-
-    def forward(self, x: torch.Tensor):
-        x = self.model.encode_image(x)
-        return x
 
 
 class CLIPModelPretrained(Module):
