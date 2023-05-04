@@ -1,10 +1,10 @@
 from annoy import AnnoyIndex
-from PIL import Image
 import torch
-from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 from src.data import Paris6kDataset
 from src.models import CLIPModelPretrained
+from src.utils.embeddings import create_img_embeddings, save_img_embeddings
 
 # Configs ---------------------------------------------------------------------------------------
 DATA_PATH = "../../dataset/paris6k"
@@ -15,32 +15,24 @@ INDEX_TREE = 25
 INDEX_SAVE_PATH = f"../../embeddings/index{INDEX_TREE}_clip_ViT-B-32_laion2B_paris6k.ann"
 # -----------------------------------------------------------------------------------------------
 
-# Dataset
-gallery_dataset = Paris6kDataset(root=DATA_PATH, query=False)
-gallery_data = gallery_dataset.data
+# Device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {device}")
 
 # Load pretrained CLIP model
 model = CLIPModelPretrained(model_name=MODEL_NAME, pretrained_model=PRETRAINED_MODEL)
+model.to(device)
+
+# Image transforms
+transform = model.preprocess
+
+# Dataset
+dataset = Paris6kDataset(root=DATA_PATH, transform=transform)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 # Create image embeddings
-model.eval()
-embeddings = []
-with torch.no_grad():
-    for (img, label) in tqdm(gallery_data, desc="Gallery embeddings"):
-        img = Image.open(img)
-        img_feature = model(img)
-        embeddings.append(img_feature.numpy().reshape(-1))
+embeddings = create_img_embeddings(model=model, dataloader=dataloader, device=device)
 
-# Create annoy index
-index = AnnoyIndex(512, INDEX_METRIC)
-for i, embedding in enumerate(embeddings):
-    index.add_item(i, embedding)
-
-index.build(n_trees=INDEX_TREE)
-index.save(INDEX_SAVE_PATH)
-
-
-
-
-
-
+# Create and save annoy index
+save_img_embeddings(embedding_list=embeddings, save_path=INDEX_SAVE_PATH, embedding_dim=512, metric=INDEX_METRIC,
+                    n_trees=INDEX_TREE)

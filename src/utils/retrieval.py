@@ -1,10 +1,19 @@
 from matplotlib import pyplot as plt
 from PIL import Image
 import torch
+from torchvision import transforms
 
 
-def get_indexes(model, img_path, embeddings, top_k):
+def get_indexes(model, img_path, embeddings, top_k, transform=None):
+    """Return the indexes of the top_k most similar images to the query image."""
     img = Image.open(img_path)
+    if transform:
+        img = transform(img)
+    else:
+        img = transforms.ToTensor()(img)
+
+    img = img.unsqueeze(0)
+
     model.eval()
     with torch.no_grad():
         img_feature = model(img)
@@ -45,6 +54,4 @@ def visualize_retrieval_results(query_label, img_path, gallery_img, indexes):
             rect = plt.Rectangle((0, 0), img_size[0], img_size[1], fill=False, edgecolor="red", linewidth=3)
             ax[i // 3 + 1, i % 3].add_patch(rect)
     plt.show()
-
-
 
