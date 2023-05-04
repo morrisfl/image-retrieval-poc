@@ -5,7 +5,6 @@ from PIL import Image
 import os
 
 
-
 LANDMARKS = ["defense", "eiffel", "general", "invalides", "louvre", "moulinrouge", "museedorsay", "notredame",
              "pantheon", "pompidou", "sacrecoeur", "triomphe"]
 
